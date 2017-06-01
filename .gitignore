@@ -2,4 +2,4 @@
 .pydevproject
 .settings/
 server-py/conf.py
-
+server-py/*.pyc
