@@ -222,5 +222,10 @@ void loop() {
     reconnect();
   }
   client.loop();
+
+  digitalWrite(PIN_MAIN_ROUTE, LOW);
+  digitalWrite(PIN_GARAGE_ROUTE, LOW);
+  digitalWrite(PIN_GARAGE_ROUTE2, LOW);
+
   
 }
