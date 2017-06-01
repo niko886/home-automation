@@ -1,13 +1,16 @@
 #!/usr/bin/python
 # -*- coding: utf8 -*-
 
+
+import threading
 import paho.mqtt.client as mqtt
 
-from optparse import OptionParser
-import threading
-import time
+import conf
 
-_VERSION_ = '0.0.2'
+from datetime import datetime
+from optparse import OptionParser
+
+_VERSION_ = '0.0.3'
 
 class myThread (threading.Thread):
     def __init__(self, event):
@@ -15,7 +18,7 @@ class myThread (threading.Thread):
         self._event = event
         
         self._cli = mqtt.Client()
-        self._cli.connect("192.168.0.20", 1883, 60)
+        self._cli.connect(conf.SERVER_ADDR, 1883, 60)
         self._vc = valveControl(self._cli)
       
     def run(self):
@@ -164,7 +167,7 @@ if __name__ == "__main__":
     cli.on_connect = on_connect
     cli.on_message = on_message
      
-    cli.connect("192.168.0.20", 1883, 60)
+    cli.connect(conf.SERVER_ADDR, 1883, 60)
     
     vc = valveControl(cli)
     cli.vc = vc
@@ -193,7 +196,15 @@ if __name__ == "__main__":
                   action="store_true", dest="daemon", default=False,
                   )
 
+    parser.add_option("-t", "--print-time",
+                  action="store_true", dest="printTime", default=False,
+                  )
+
     (options, args) = parser.parse_args()
+
+
+    if options.printTime:
+        print(datetime.strftime(datetime.now(), "%Y-%m-%d %H:%M:%S"))
     
     if options.on:
         vc.turnAll(1)
