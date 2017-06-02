@@ -4,6 +4,8 @@
 
 import threading
 import paho.mqtt.client as mqtt
+import paho.mqtt.publish as publish
+import time
 
 import conf
 
@@ -15,11 +17,8 @@ _VERSION_ = '0.0.3'
 class myThread (threading.Thread):
     def __init__(self, event):
         threading.Thread.__init__(self)
-        self._event = event
-        
-        self._cli = mqtt.Client()
-        self._cli.connect(conf.SERVER_ADDR, 1883, 60)
-        self._vc = valveControl(self._cli)
+        self._event = event        
+        self._vc = valveControl()
       
     def run(self):
         
@@ -27,15 +26,16 @@ class myThread (threading.Thread):
 
 def on_connect(client, userdata, flags, rc):
     
-    print("Connected with result code "+str(rc))
+    print('Connected with result code '+str(rc))
 
-    client.subscribe("water/control")    
+    client.subscribe('water/control')    
     client._event = threading.Event()    
     client._mythreads = []
+    client._vc = valveControl()
 
 def on_message(client, userdata, msg):
     
-    print(msg.topic+" "+str(msg.payload))
+    print(msg.topic+' '+str(msg.payload))
     
     if msg.payload == 'allOn':
 
@@ -44,7 +44,7 @@ def on_message(client, userdata, msg):
             t.join()             
         client._mythreads = []
 
-        client.vc.turnAll(1)
+        client._vc.turnAll(1)
 
     if msg.payload == 'makeFun':
         
@@ -62,7 +62,7 @@ def on_message(client, userdata, msg):
             t.join()             
         client._mythreads = []
         
-        client.vc.turnAll(0)
+        client._vc.turnAll(0)
 
 class valveControl():
     
@@ -70,9 +70,9 @@ class valveControl():
     _dropZones = ['2']
     _event = None
 
-    def __init__(self, client):
+    def __init__(self):
         
-        self._cli = client
+        pass
 
     def turnAll(self, onOff, dropOnly=False, wateringOnly=False):
         
@@ -88,24 +88,36 @@ class valveControl():
             
         if not dropOnly and not wateringOnly:
             zones = self._zones + self._dropZones
+            
+            
+        messages = []
         
         for i in zones:
             
-            msg = "%s%s" % (str(i), str(onOff))        
-            self._cli.publish("water", msg)
+            oneMessage = {'topic': 'water',
+                          'payload': '%s%s' % (str(i), str(onOff))}
             
-            print("msg sent: [water: %s]" % msg)
+            messages.append(oneMessage)
+            
+        print('[*] publishing: %s' % messages)
+        publish.multiple(messages, hostname=conf.SERVER_ADDR)
+            
         
     def dropOn(self):
         
+        
+        messages = []
+        
         for i in self._dropZones:
             
-            msg = "%s%s" % (str(i), '1')        
-            self._cli.publish("water", msg)
+            oneMessage = {'topic': 'water',
+                          'payload': '%s%s' % (str(i), '1')}
             
-            print("msg sent: [water: %s]" % msg)
+            messages.append(oneMessage)        
+
+        print('[*] publishing: %s' % messages)
+        publish.multiple(messages, hostname=conf.SERVER_ADDR)
             
-        
         
     def round1(self, delay):
         
@@ -114,13 +126,13 @@ class valveControl():
             if self._event and not self._event.is_set():
                 return
             
-            self._cli.publish("water", z + "1")
-            print("water", z + "1")
+            publish.single('water', z + '1', hostname=conf.SERVER_ADDR)
+            print('water', z + '1')
             
             time.sleep(delay)
             
-            self._cli.publish("water", z + "0")
-            print("water", z + "0")
+            publish.single('water', z + '0', hostname=conf.SERVER_ADDR)
+            print('water', z + '0')
 
     def round2(self, delay):
 
@@ -144,7 +156,7 @@ class valveControl():
 
     def makeFun(self, event):
     
-        print("making some fun...")
+        print('making some fun...')
         
         self.turnAll(0)
         self._event = event
@@ -172,55 +184,47 @@ class valveControl():
                
             self.round3(5)
     
-        print("fun done")        
+        print('fun done')        
     
-if __name__ == "__main__":
+if __name__ == '__main__':
+        
+    vc = valveControl()    
     
-    cli = mqtt.Client()
-    cli.on_connect = on_connect
-    cli.on_message = on_message
-     
-    cli.connect(conf.SERVER_ADDR, 1883, 60)
+    parser = OptionParser(usage='usage: %prog [options]', version='%prog ' + _VERSION_)    
     
-    vc = valveControl(cli)
-    cli.vc = vc
-    
-    
-    parser = OptionParser(usage="usage: %prog [options]", version="%prog " + _VERSION_)    
-    
-    parser.add_option("-1", "--on",
-                  action="store_true", dest="on", default=False,
+    parser.add_option('-1', '--on',
+                  action='store_true', dest='on', default=False,
                   )
 
-    parser.add_option("-r", "--drop-on",
-                  action="store_true", dest="dropOn", default=False,
+    parser.add_option('-r', '--drop-on',
+                  action='store_true', dest='dropOn', default=False,
                   )
 
-    parser.add_option("-w", "--watering-on",
-                  action="store_true", dest="wateringOn", default=False,
+    parser.add_option('-w', '--watering-on',
+                  action='store_true', dest='wateringOn', default=False,
                   )
     
-    parser.add_option("-0", "--off",
-                  action="store_true", dest="off", default=False,
+    parser.add_option('-0', '--off',
+                  action='store_true', dest='off', default=False,
                   )
 
-    parser.add_option("-f", "--fun",
-                  action="store_true", dest="fun", default=False,
+    parser.add_option('-f', '--fun',
+                  action='store_true', dest='fun', default=False,
                   )
 
-    parser.add_option("-d", "--daemon",
-                  action="store_true", dest="daemon", default=False,
+    parser.add_option('-d', '--daemon',
+                  action='store_true', dest='daemon', default=False,
                   )
 
-    parser.add_option("-t", "--print-time",
-                  action="store_true", dest="printTime", default=False,
+    parser.add_option('-t', '--print-time',
+                  action='store_true', dest='printTime', default=False,
                   )
 
     (options, args) = parser.parse_args()
 
 
     if options.printTime:
-        print(datetime.strftime(datetime.now(), "%Y-%m-%d %H:%M:%S"))
+        print(datetime.strftime(datetime.now(), '%Y-%m-%d %H:%M:%S'))
     
     if options.on:
         vc.turnAll(1)
@@ -238,6 +242,13 @@ if __name__ == "__main__":
         vc.turnAll(1, wateringOnly=True)
         
     elif options.daemon:
+        
+        cli = mqtt.Client()
+        cli.on_connect = on_connect
+        cli.on_message = on_message
+          
+        cli.connect(conf.SERVER_ADDR, 1883, 60)    
+            
         cli.loop_forever()
     
     
