@@ -74,9 +74,22 @@ class valveControl():
         
         self._cli = client
 
-    def turnAll(self, onOff):
+    def turnAll(self, onOff, dropOnly=False, wateringOnly=False):
         
-        for i in self._zones + self._dropZones:
+        
+        zones = []
+        
+        
+        if dropOnly:            
+            zones += self._dropZones
+            
+        if wateringOnly:
+            zones += self._zones
+            
+        if not dropOnly and not wateringOnly:
+            zones = self._zones + self._dropZones
+        
+        for i in zones:
             
             msg = "%s%s" % (str(i), str(onOff))        
             self._cli.publish("water", msg)
@@ -183,6 +196,9 @@ if __name__ == "__main__":
                   action="store_true", dest="dropOn", default=False,
                   )
 
+    parser.add_option("-w", "--watering-on",
+                  action="store_true", dest="wateringOn", default=False,
+                  )
     
     parser.add_option("-0", "--off",
                   action="store_true", dest="off", default=False,
@@ -217,6 +233,9 @@ if __name__ == "__main__":
         
     elif options.dropOn:
         vc.dropOn()
+        
+    elif options.wateringOn:
+        vc.turnAll(1, wateringOnly=True)
         
     elif options.daemon:
         cli.loop_forever()
